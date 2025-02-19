@@ -1,0 +1,6 @@
+echo 'name = "cf-worker"
+main = "src/index.js"
+compatibility_date = "2024-02-19"
+
+[triggers]
+routes = []' > wrangler.toml
