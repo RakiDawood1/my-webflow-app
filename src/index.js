@@ -16,7 +16,7 @@ export default {
       }
   
       // Fetch your JavaScript from GitHub
-      const githubURL = 'https://raw.githubusercontent.com/RakiDawood1/my-webflow-app/main/app.js';
+      const githubURL = 'https://raw.githubusercontent.com/RakiDawood1/my-webflow-app/main/js/pp.js';
       
       try {
         const response = await fetch(githubURL);
