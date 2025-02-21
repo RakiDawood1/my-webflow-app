@@ -1,5 +1,8 @@
 export default {
   async fetch(request, env) {
+    // Parse the URL once
+    const url = new URL(request.url);
+    
     // Define your CORS headers
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*', // Or your Webflow domain
@@ -15,8 +18,18 @@ export default {
       });
     }
 
+    // Handle root path
+    if (url.pathname === '/') {
+      return new Response('Calculator API is running!', {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        }
+      });
+    }
+
     // Route for serving the JavaScript
-    if (request.url.includes('/app.js')) {
+    if (url.pathname === '/app.js') {
       // Fetch your JavaScript from GitHub
       const githubURL = 'https://raw.githubusercontent.com/RakiDawood1/my-webflow-app/main/js/app.js';
       
@@ -39,7 +52,7 @@ export default {
     }
 
     // Route for handling AI calculator requests
-    if (request.url.includes('/calculate') && request.method === 'POST') {
+    if (url.pathname === '/calculate' && request.method === 'POST') {
       try {
         // Get the query from the request
         const { query } = await request.json();
@@ -102,7 +115,7 @@ export default {
         });
       }
     }
-
+    
     // Default response for other routes
     return new Response('Not found', {
       status: 404,
