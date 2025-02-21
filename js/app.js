@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const errorMessage = document.getElementById('error-message'); // Add this element in Webflow
   
   // Your worker URL (Cloudflare worker)
-  const workerURL = 'https://cf-worker.weblabsters.workers.dev'; // Your actual domain
+  const workerURL = 'https://cf-worker.weblabsters.workers.dev'; // Your actual worker domain
   
   // Function to show/hide loading state
   function setLoading(isLoading) {

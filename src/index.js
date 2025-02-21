@@ -126,14 +126,7 @@ export default {
             {
               parts: [
                 {
-                  text: "You are a calculator assistant that interprets natural language math questions and provides numerical answers. Respond only with the calculation result as a number, without any explanation or text."
-                }
-              ]
-            },
-            {
-              parts: [
-                {
-                  text: query
+                  text: "You are a calculator assistant. For the following math question, respond ONLY with the numerical answer. No words, just the number: " + query
                 }
               ]
             }
