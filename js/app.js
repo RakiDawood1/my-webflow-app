@@ -1,149 +1,198 @@
-// AI-powered calculator app that works with Webflow elements
-document.addEventListener('DOMContentLoaded', () => {
-  // Find all the elements by their IDs
-  const calculatorForm = document.querySelector('form');
-  const naturalLanguageInput = document.getElementById('query-input'); // Add this input in Webflow
-  const number1Input = document.getElementById('number-1');
-  const number2Input = document.getElementById('number-2');
-  const answerElement = document.getElementById('answer');
-  const submitButton = document.querySelector('input[type="submit"]');
-  const loadingIndicator = document.getElementById('loading-indicator'); // Add this element in Webflow
-  const errorMessage = document.getElementById('error-message'); // Add this element in Webflow
-  
-  // Your worker URL (Cloudflare worker)
-  const workerURL = 'https://cf-worker.weblabsters.workers.dev'; // Your actual worker domain
-  
-  // Function to show/hide loading state
-  function setLoading(isLoading) {
-    if (loadingIndicator) {
-      loadingIndicator.style.display = isLoading ? 'block' : 'none';
+export default {
+  async fetch(request, env) {
+    // Parse the URL once
+    const url = new URL(request.url);
+    
+    // Define your CORS headers
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*', // Or your Webflow domain
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+      'Content-Type': 'application/json'
+    };
+
+    // Handle OPTIONS request for CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: corsHeaders
+      });
     }
-    if (submitButton) {
-      submitButton.disabled = isLoading;
+
+    // Handle root path
+    if (url.pathname === '/') {
+      return new Response('Calculator API is running!', {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        }
+      });
     }
-  }
-  
-  // Function to display errors
-  function showError(message) {
-    if (errorMessage) {
-      errorMessage.textContent = message;
-      errorMessage.style.display = 'block';
-    } else {
-      console.error(message);
+    
+    // Test route for the Gemini API
+    if (url.pathname === '/test-gemini' && request.headers.get('X-Debug-Key') === 'your-debug-password') {
+      try {
+        const apiKey = env.GEMINI_API_KEY || env.GEMINI_API_KEY_NEW;
+        
+        // Simple test query
+        const testData = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: "You are a calculator. Respond with just the number 42."
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0
+          }
+        };
+        
+        // Make request to Gemini API
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(testData)
+        });
+        
+        const result = await response.json();
+        
+        return new Response(JSON.stringify({
+          status: 'API test response',
+          apiKeyExists: !!apiKey,
+          apiKeyLength: apiKey ? apiKey.length : 0,
+          responseStatus: response.status,
+          responseBody: result
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({
+          status: 'error',
+          message: error.message,
+          stack: error.stack
+        }), {
+          status: 500,
+          headers: corsHeaders
+        });
+      }
     }
-  }
-  
-  // Hide error when user starts typing
-  if (naturalLanguageInput) {
-    naturalLanguageInput.addEventListener('input', () => {
-      if (errorMessage) errorMessage.style.display = 'none';
+
+    // Route for serving the JavaScript
+    if (url.pathname === '/app.js') {
+      // Fetch your JavaScript from GitHub
+      const githubURL = 'https://raw.githubusercontent.com/RakiDawood1/my-webflow-app/main/js/app.js';
+      
+      try {
+        const response = await fetch(githubURL);
+        const jsContent = await response.text();
+        
+        return new Response(jsContent, {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/javascript'
+          }
+        });
+      } catch (error) {
+        return new Response('Error loading script: ' + error.message, {
+          status: 500,
+          headers: corsHeaders
+        });
+      }
+    }
+
+    // Route for handling AI calculator requests
+    if (url.pathname === '/calculate' && request.method === 'POST') {
+      try {
+        // Get the query from the request
+        const { query } = await request.json();
+        
+        if (!query) {
+          return new Response(JSON.stringify({ error: 'Query is required' }), {
+            status: 400,
+            headers: corsHeaders
+          });
+        }
+
+        // Prepare the message for Gemini API
+        const geminiData = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: "You are a calculator assistant. For the following math question, respond ONLY with the numerical answer. No words, just the number: " + query
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1
+          }
+        };
+
+        // Try to get the API key from either environment variable
+        const apiKey = env.GEMINI_API_KEY || env.GEMINI_API_KEY_NEW;
+        
+        // Make request to Gemini API
+        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(geminiData)
+        });
+
+        const geminiResult = await geminiResponse.json();
+        
+        // Log the response for debugging
+        console.log('Gemini API response:', JSON.stringify(geminiResult));
+        
+        // Check if the response is properly formatted
+        if (!geminiResult.candidates || !geminiResult.candidates[0] || 
+            !geminiResult.candidates[0].content || !geminiResult.candidates[0].content.parts || 
+            !geminiResult.candidates[0].content.parts[0]) {
+          
+          // If there's an error in the API response
+          if (geminiResult.error) {
+            throw new Error(`Gemini API error: ${geminiResult.error.message || JSON.stringify(geminiResult.error)}`);
+          }
+          
+          throw new Error('Invalid response format from Gemini API');
+        }
+        
+        // Extract just the numerical answer
+        const answer = geminiResult.candidates[0].content.parts[0].text.trim();
+
+        // Return the result
+        return new Response(JSON.stringify({ 
+          result: answer,
+          query: query
+        }), {
+          headers: corsHeaders
+        });
+      } catch (error) {
+        console.error('Calculate endpoint error:', error);
+        
+        return new Response(JSON.stringify({ 
+          error: error.message,
+          details: 'An error occurred processing your request with the AI service'
+        }), {
+          status: 500,
+          headers: corsHeaders
+        });
+      }
+    }
+    
+    // Default response for other routes
+    return new Response('Not found', {
+      status: 404,
+      headers: corsHeaders
     });
   }
-  
-  // Function to handle traditional calculator
-  function calculateSum(event) {
-    // Prevent the default form submission behavior
-    event.preventDefault();
-    
-    // Get the input values and convert to numbers
-    const num1 = parseFloat(number1Input.value) || 0;
-    const num2 = parseFloat(number2Input.value) || 0;
-    
-    // Calculate the sum
-    const sum = num1 + num2;
-    
-    // Display the result
-    if (answerElement) {
-      answerElement.textContent = sum;
-    }
-    
-    // Log for debugging
-    console.log(`Calculated: ${num1} + ${num2} = ${sum}`);
-  }
-  
-  // Function to handle AI-powered natural language calculation
-  async function calculateNaturalLanguage(event) {
-    event.preventDefault();
-    
-    // Check if natural language input exists
-    if (!naturalLanguageInput) {
-      console.error('Natural language input not found');
-      return;
-    }
-    
-    const query = naturalLanguageInput.value.trim();
-    
-    // Validate input
-    if (!query) {
-      showError('Please enter a math question');
-      return;
-    }
-    
-    try {
-      // Set loading state
-      setLoading(true);
-      
-      // Send the query to our worker
-      const response = await fetch(`${workerURL}/calculate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ query })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to get calculation');
-      }
-      
-      const data = await response.json();
-      
-      // Display the result
-      if (answerElement) {
-        answerElement.textContent = data.result;
-      }
-      
-      console.log(`Natural language calculation: "${query}" = ${data.result}`);
-      
-    } catch (error) {
-      showError(`Error: ${error.message}`);
-      console.error('Calculation error:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-  
-  // Determine which function to use based on available inputs
-  function handleFormSubmit(event) {
-    event.preventDefault();
-    
-    if (naturalLanguageInput && naturalLanguageInput.value.trim()) {
-      // If natural language input is present and has a value, use AI calculation
-      calculateNaturalLanguage(event);
-    } else if (number1Input && number2Input) {
-      // Otherwise fall back to traditional calculator
-      calculateSum(event);
-    } else {
-      showError('Please enter either a natural language query or numbers');
-    }
-  }
-  
-  // Add event listeners
-  if (calculatorForm) {
-    calculatorForm.addEventListener('submit', handleFormSubmit);
-    console.log('AI Calculator initialized and ready!');
-  } else if (submitButton) {
-    // Find the form and attach the event to the form submission
-    const form = submitButton.closest('form');
-    if (form) {
-      form.addEventListener('submit', handleFormSubmit);
-      console.log('AI Calculator initialized and ready!');
-    } else {
-      console.error('Could not find form element');
-      // Fallback: attach to button click if form not found
-      submitButton.addEventListener('click', handleFormSubmit);
-    }
-  } else {
-    console.error('Form and submit button not found');
-  }
-});
+};
