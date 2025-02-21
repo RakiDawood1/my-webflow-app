@@ -27,6 +27,62 @@ export default {
         }
       });
     }
+    
+    // Test route for the Gemini API
+    if (url.pathname === '/test-gemini' && request.headers.get('X-Debug-Key') === 'your-debug-password') {
+      try {
+        const apiKey = env.GEMINI_API_KEY || env.GEMINI_API_KEY_NEW;
+        
+        // Simple test query
+        const testData = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: "You are a calculator. Respond with just the number 42."
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0
+          }
+        };
+        
+        // Make request to Gemini API
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(testData)
+        });
+        
+        const result = await response.json();
+        
+        return new Response(JSON.stringify({
+          status: 'API test response',
+          apiKeyExists: !!apiKey,
+          apiKeyLength: apiKey ? apiKey.length : 0,
+          responseStatus: response.status,
+          responseBody: result
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({
+          status: 'error',
+          message: error.message,
+          stack: error.stack
+        }), {
+          status: 500,
+          headers: corsHeaders
+        });
+      }
+    }
 
     // Route for serving the JavaScript
     if (url.pathname === '/app.js') {
@@ -87,8 +143,11 @@ export default {
           }
         };
 
+        // Try to get the API key from either environment variable
+        const apiKey = env.GEMINI_API_KEY || env.GEMINI_API_KEY_NEW;
+        
         // Make request to Gemini API
-        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${env.GEMINI_API_KEY}`, {
+        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -97,6 +156,22 @@ export default {
         });
 
         const geminiResult = await geminiResponse.json();
+        
+        // Log the response for debugging
+        console.log('Gemini API response:', JSON.stringify(geminiResult));
+        
+        // Check if the response is properly formatted
+        if (!geminiResult.candidates || !geminiResult.candidates[0] || 
+            !geminiResult.candidates[0].content || !geminiResult.candidates[0].content.parts || 
+            !geminiResult.candidates[0].content.parts[0]) {
+          
+          // If there's an error in the API response
+          if (geminiResult.error) {
+            throw new Error(`Gemini API error: ${geminiResult.error.message || JSON.stringify(geminiResult.error)}`);
+          }
+          
+          throw new Error('Invalid response format from Gemini API');
+        }
         
         // Extract just the numerical answer
         const answer = geminiResult.candidates[0].content.parts[0].text.trim();
@@ -109,7 +184,12 @@ export default {
           headers: corsHeaders
         });
       } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+        console.error('Calculate endpoint error:', error);
+        
+        return new Response(JSON.stringify({ 
+          error: error.message,
+          details: 'An error occurred processing your request with the AI service'
+        }), {
           status: 500,
           headers: corsHeaders
         });
