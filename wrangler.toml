@@ -1,3 +1,16 @@
 name = "cf-worker"
 main = "src/index.js"
 compatibility_date = "2024-02-19"
+
+# Environment variables
+[vars]
+# Example API key placeholder - you'll need to set the actual key in the Cloudflare dashboard
+# or via wrangler secret commands
+GEMINI_API_KEY = "AIzaSyA_PeN24TN1LAD3RqzLwIWRKVf2qYUrWZg"
+
+# Alternatively, use environment-specific variables
+[env.production]
+# Production-specific settings
+
+[env.development]
+# Development-specific settings
